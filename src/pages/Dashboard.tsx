@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { useMonth } from '../contexts/MonthContext';
+import { formatCurrency, getMonthName } from '../lib/formatting';
 import { FileText, Users, Wallet, DollarSign } from 'lucide-react';
 
 export function Dashboard() {
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  });
+  const { selectedMonth, setSelectedMonth } = useMonth();
+  const [availableMonths, setAvailableMonths] = useState<{ month: number; year: number }[]>([]);
 
   const [stats, setStats] = useState({
     totalInvoiced: 0,
@@ -18,13 +18,51 @@ export function Dashboard() {
     totalFuel: 0,
     totalFoodBill: 0,
     totalPettyCash: 0,
+    totalAdvance: 0,
   });
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    loadDashboardData();
+    loadAvailableMonths();
+  }, []);
+
+  useEffect(() => {
+    if (selectedMonth) {
+      loadDashboardData();
+    } else {
+      setStats({
+        totalInvoiced: 0,
+        totalAssignments: 0,
+        totalGuards: 0,
+        totalSalaries: 0,
+        totalRent: 0,
+        totalUniforms: 0,
+        totalFuel: 0,
+        totalFoodBill: 0,
+        totalPettyCash: 0,
+        totalAdvance: 0,
+      });
+    }
   }, [selectedMonth]);
+
+  const loadAvailableMonths = async () => {
+    const { data } = await supabase
+      .from('invoice_months')
+      .select('month, year')
+      .order('year', { ascending: false })
+      .order('month', { ascending: false });
+
+    if (data) {
+      const uniqueMonths = Array.from(
+        new Set(data.map((item) => `${item.year}-${item.month}`))
+      ).map((key) => {
+        const [year, month] = key.split('-').map(Number);
+        return { year, month };
+      });
+      setAvailableMonths(uniqueMonths);
+    }
+  };
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -37,9 +75,12 @@ export function Dashboard() {
         .eq('year', year)
         .eq('month', month);
 
-      const { data: assignments } = await supabase
+      const invoiceAssignmentIds = invoiceMonths?.map((inv) => inv.assignment_id) || [];
+
+      const { data: guardsByAssignment } = await supabase
         .from('assignments')
-        .select('number_of_guards');
+        .select('id, number_of_guards')
+        .in('id', invoiceAssignmentIds.length > 0 ? invoiceAssignmentIds : ['00000000-0000-0000-0000-000000000000']);
 
       const { data: salaries } = await supabase
         .from('salaries')
@@ -80,8 +121,15 @@ export function Dashboard() {
         .eq('year', year)
         .eq('month', month);
 
+      const { data: advance } = await supabase
+        .from('advance')
+        .select('amount')
+        .eq('year', year)
+        .eq('month', month)
+        .maybeSingle();
+
       const totalInvoiced = invoiceMonths?.reduce((sum, inv) => sum + Number(inv.total_invoice_amount), 0) || 0;
-      const totalGuards = assignments?.reduce((sum, asg) => sum + Number(asg.number_of_guards), 0) || 0;
+      const totalGuards = guardsByAssignment?.reduce((sum, asg) => sum + Number(asg.number_of_guards), 0) || 0;
       const totalUniforms = uniforms?.reduce((sum, u) => sum + Number(u.amount), 0) || 0;
       const totalFuel = fuel?.reduce((sum, f) => sum + Number(f.amount), 0) || 0;
       const totalPettyCash = pettyCash?.reduce((sum, p) => sum + Number(p.amount || 0), 0) || 0;
@@ -96,6 +144,7 @@ export function Dashboard() {
         totalFuel,
         totalFoodBill: Number(foodBill?.total_amount || 0),
         totalPettyCash,
+        totalAdvance: Number(advance?.amount || 0),
       });
     } catch (error) {
       console.error('Error loading dashboard data:', error);
@@ -104,15 +153,8 @@ export function Dashboard() {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
-
   const totalExpenses = stats.totalSalaries + stats.totalRent + stats.totalUniforms +
-                        stats.totalFuel + stats.totalFoodBill + stats.totalPettyCash;
+                        stats.totalFuel + stats.totalFoodBill + stats.totalPettyCash + stats.totalAdvance;
 
   return (
     <div>
@@ -122,17 +164,28 @@ export function Dashboard() {
           <label htmlFor="month" className="text-sm font-medium text-slate-700 mr-3">
             Select Month:
           </label>
-          <input
-            type="month"
+          <select
             id="month"
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
             className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
+          >
+            <option value="">Choose a month</option>
+            {availableMonths.map((item) => (
+              <option key={`${item.year}-${item.month}`} value={`${item.year}-${item.month}`}>
+                {getMonthName(item.month)} {item.year}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {loading ? (
+      {!selectedMonth ? (
+        <div className="text-center py-16 bg-slate-50 rounded-lg border border-slate-200">
+          <p className="text-slate-600 text-lg mb-2">No month selected</p>
+          <p className="text-slate-500 text-sm">Select a month above to view dashboard metrics</p>
+        </div>
+      ) : loading ? (
         <div className="text-center py-12">
           <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-slate-600">Loading dashboard...</p>
@@ -170,7 +223,7 @@ export function Dashboard() {
 
           <div>
             <h3 className="text-lg font-semibold text-slate-800 mb-4">Expenses Overview</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
                 <p className="text-xs font-medium text-slate-600 mb-1">Salaries</p>
                 <p className="text-lg font-bold text-slate-900">{formatCurrency(stats.totalSalaries)}</p>
@@ -199,6 +252,11 @@ export function Dashboard() {
               <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
                 <p className="text-xs font-medium text-slate-600 mb-1">Petty Cash</p>
                 <p className="text-lg font-bold text-slate-900">{formatCurrency(stats.totalPettyCash)}</p>
+              </div>
+
+              <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+                <p className="text-xs font-medium text-slate-600 mb-1">Advance</p>
+                <p className="text-lg font-bold text-slate-900">{formatCurrency(stats.totalAdvance)}</p>
               </div>
             </div>
           </div>

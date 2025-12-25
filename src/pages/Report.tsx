@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { useMonth } from '../contexts/MonthContext';
+import { formatCurrency, getMonthName } from '../lib/formatting';
 import { FileText } from 'lucide-react';
 
 interface InvoiceData {
@@ -24,10 +26,11 @@ interface ExpenseSummary {
   fuel: number;
   foodBill: number;
   pettyCash: number;
+  advance: number;
 }
 
 export function Report() {
-  const [selectedMonth, setSelectedMonth] = useState('');
+  const { selectedMonth, setSelectedMonth } = useMonth();
   const [availableMonths, setAvailableMonths] = useState<{ month: number; year: number }[]>([]);
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState<{
@@ -141,6 +144,13 @@ export function Report() {
         .eq('year', year)
         .eq('month', month);
 
+      const { data: advance } = await supabase
+        .from('advance')
+        .select('amount')
+        .eq('year', year)
+        .eq('month', month)
+        .maybeSingle();
+
       const expenses: ExpenseSummary = {
         salaries: Number(salaries?.total_amount || 0),
         rent: Number(rent?.amount || 0),
@@ -148,6 +158,7 @@ export function Report() {
         fuel: fuel?.reduce((sum, f) => sum + Number(f.amount), 0) || 0,
         foodBill: Number(foodBill?.total_amount || 0),
         pettyCash: pettyCash?.reduce((sum, p) => sum + Number(p.amount || 0), 0) || 0,
+        advance: Number(advance?.amount || 0),
       };
 
       setReportData({ invoices, payments, outstanding, expenses });
@@ -158,16 +169,12 @@ export function Report() {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
-
-  const getMonthName = (month: number) => {
-    return new Date(2000, month - 1).toLocaleString('default', { month: 'long' });
-  };
+  useEffect(() => {
+    if (selectedMonth) {
+      const [year, month] = selectedMonth.split('-').map(Number);
+      setReportData(null);
+    }
+  }, [selectedMonth]);
 
   const totalInvoiced = reportData?.invoices.reduce((sum, inv) => sum + inv.invoice_amount, 0) || 0;
   const totalReceived = reportData?.payments.reduce((sum, pay) => sum + pay.amount_paid, 0) || 0;
@@ -353,6 +360,10 @@ export function Report() {
                   <tr className="border-b border-slate-100">
                     <td className="py-2 px-4 text-slate-900">Petty Cashes</td>
                     <td className="py-2 px-4 text-right text-slate-900">{formatCurrency(reportData.expenses.pettyCash)}</td>
+                  </tr>
+                  <tr className="border-b border-slate-100">
+                    <td className="py-2 px-4 text-slate-900">Advance</td>
+                    <td className="py-2 px-4 text-right text-slate-900">{formatCurrency(reportData.expenses.advance)}</td>
                   </tr>
                   <tr className="bg-red-50 font-bold">
                     <td className="py-2 px-4 text-slate-900">Total Expenses</td>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { formatCurrency, formatDate, getMonthName } from '../lib/formatting';
 import { ChevronRight, Plus, Edit2, Trash2, X, ArrowLeft } from 'lucide-react';
 
 interface Assignment {
@@ -133,16 +134,6 @@ export function InvoiceMonths() {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
-
-  const getMonthName = (month: number) => {
-    return new Date(2000, month - 1).toLocaleString('default', { month: 'long' });
-  };
 
   if (loading) {
     return (
@@ -215,60 +206,71 @@ export function InvoiceMonths() {
           <p className="text-slate-600">No invoice months found. Add your first invoice month to get started.</p>
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-200">
-                <th className="text-left py-3 px-4 font-semibold text-slate-700">Month</th>
-                <th className="text-right py-3 px-4 font-semibold text-slate-700">Invoice Amount</th>
-                <th className="text-center py-3 px-4 font-semibold text-slate-700">Status</th>
-                <th className="text-center py-3 px-4 font-semibold text-slate-700">Date Paid</th>
-                <th className="text-center py-3 px-4 font-semibold text-slate-700">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoiceMonths.map((invoice) => (
-                <tr key={invoice.id} className="border-b border-slate-100 hover:bg-slate-50">
-                  <td className="py-3 px-4 font-medium text-slate-900">
-                    {getMonthName(invoice.month)} {invoice.year}
-                  </td>
-                  <td className="py-3 px-4 text-right text-slate-700">
-                    {formatCurrency(invoice.total_invoice_amount)}
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    <span
-                      className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                        invoice.status === 'paid'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}
-                    >
-                      {invoice.status.toUpperCase()}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-center text-slate-700">
-                    {invoice.date_paid ? new Date(invoice.date_paid).toLocaleDateString() : '-'}
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="flex items-center justify-center space-x-2">
-                      <button
-                        onClick={() => openModal(invoice)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(invoice.id)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
+        <div>
+          <div className="overflow-x-auto mb-6">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-200">
+                  <th className="text-left py-3 px-4 font-semibold text-slate-700">Month</th>
+                  <th className="text-right py-3 px-4 font-semibold text-slate-700">Invoice Amount</th>
+                  <th className="text-center py-3 px-4 font-semibold text-slate-700">Status</th>
+                  <th className="text-center py-3 px-4 font-semibold text-slate-700">Date Paid</th>
+                  <th className="text-center py-3 px-4 font-semibold text-slate-700">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {invoiceMonths.map((invoice) => (
+                  <tr key={invoice.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <td className="py-3 px-4 font-medium text-slate-900">
+                      {getMonthName(invoice.month)} {invoice.year}
+                    </td>
+                    <td className="py-3 px-4 text-right text-slate-700">
+                      {formatCurrency(invoice.total_invoice_amount)}
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <span
+                        className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                          invoice.status === 'paid'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-amber-100 text-amber-800'
+                        }`}
+                      >
+                        {invoice.status.toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-center text-slate-700">
+                      {invoice.date_paid ? formatDate(invoice.date_paid) : '-'}
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex items-center justify-center space-x-2">
+                        <button
+                          onClick={() => openModal(invoice)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(invoice.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <p className="text-sm font-medium text-blue-800 mb-2">Total Amount Owed</p>
+            <p className="text-2xl font-bold text-blue-900">
+              {formatCurrency(invoiceMonths
+                .filter((inv) => inv.status === 'due')
+                .reduce((sum, inv) => sum + Number(inv.total_invoice_amount), 0))}
+            </p>
+          </div>
         </div>
       )}
 
