@@ -19,7 +19,11 @@ interface InvoiceMonth {
   date_paid: string | null;
 }
 
-export function InvoiceMonths() {
+interface InvoiceMonthsProps {
+  searchQuery?: string;
+}
+
+export function InvoiceMonths({ searchQuery = '' }: InvoiceMonthsProps) {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   const [invoiceMonths, setInvoiceMonths] = useState<InvoiceMonth[]>([]);
@@ -144,17 +148,23 @@ export function InvoiceMonths() {
     );
   }
 
+  const filteredAssignments = assignments.filter((assignment) =>
+    assignment.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   if (!selectedAssignment) {
     return (
       <div>
         <h3 className="text-lg font-semibold text-slate-800 mb-4">Select an Assignment</h3>
-        {assignments.length === 0 ? (
+        {filteredAssignments.length === 0 ? (
           <div className="text-center py-12 bg-slate-50 rounded-lg border border-slate-200">
-            <p className="text-slate-600">No assignments found. Create an assignment first.</p>
+            <p className="text-slate-600">
+              {searchQuery ? 'No assignments match your search.' : 'No assignments found. Create an assignment first.'}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {assignments.map((assignment) => (
+            {filteredAssignments.map((assignment) => (
               <button
                 key={assignment.id}
                 onClick={() => setSelectedAssignment(assignment)}
@@ -176,6 +186,17 @@ export function InvoiceMonths() {
       </div>
     );
   }
+
+  const filteredInvoiceMonths = invoiceMonths.filter((invoice) => {
+    const monthYear = `${getMonthName(invoice.month)} ${invoice.year}`.toLowerCase();
+    const status = invoice.status.toLowerCase();
+    const amount = formatCurrency(invoice.total_invoice_amount).toLowerCase();
+    return (
+      monthYear.includes(searchQuery.toLowerCase()) ||
+      status.includes(searchQuery.toLowerCase()) ||
+      amount.includes(searchQuery.toLowerCase())
+    );
+  });
 
   return (
     <div>
@@ -201,9 +222,11 @@ export function InvoiceMonths() {
         </button>
       </div>
 
-      {invoiceMonths.length === 0 ? (
+      {filteredInvoiceMonths.length === 0 ? (
         <div className="text-center py-12 bg-slate-50 rounded-lg border border-slate-200">
-          <p className="text-slate-600">No invoice months found. Add your first invoice month to get started.</p>
+          <p className="text-slate-600">
+            {searchQuery ? 'No invoice months match your search.' : 'No invoice months found. Add your first invoice month to get started.'}
+          </p>
         </div>
       ) : (
         <div>
@@ -219,7 +242,7 @@ export function InvoiceMonths() {
                 </tr>
               </thead>
               <tbody>
-                {invoiceMonths.map((invoice) => (
+                {filteredInvoiceMonths.map((invoice) => (
                   <tr key={invoice.id} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="py-3 px-4 font-medium text-slate-900">
                       {getMonthName(invoice.month)} {invoice.year}

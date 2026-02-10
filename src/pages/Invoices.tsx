@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { InvoiceMonths } from './InvoiceMonths';
 import { Receipts } from './Receipts';
+import { Search } from 'lucide-react';
 
 export function Invoices() {
   const [activeSubTab, setActiveSubTab] = useState<'invoice-months' | 'receipts'>('invoice-months');
+  const [searchQuery, setSearchQuery] = useState('');
 
   return (
     <div>
@@ -32,7 +34,24 @@ export function Invoices() {
         </button>
       </div>
 
-      {activeSubTab === 'invoice-months' ? <InvoiceMonths /> : <Receipts />}
+      <div className="mb-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
+          <input
+            type="text"
+            placeholder={`Search ${activeSubTab === 'invoice-months' ? 'invoices' : 'receipts'}...`}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+      </div>
+
+      {activeSubTab === 'invoice-months' ? (
+        <InvoiceMonths searchQuery={searchQuery} />
+      ) : (
+        <Receipts searchQuery={searchQuery} />
+      )}
     </div>
   );
 }

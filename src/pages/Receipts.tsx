@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { ChevronRight, ArrowLeft, ExternalLink, Edit2, X } from 'lucide-react';
+import { ChevronRight, ArrowLeft, ExternalLink, Edit2, X, Trash2 } from 'lucide-react';
 
 interface Assignment {
   id: string;
@@ -19,7 +19,11 @@ interface Receipt {
   year?: number;
 }
 
-export function Receipts() {
+interface ReceiptsProps {
+  searchQuery?: string;
+}
+
+export function Receipts({ searchQuery = '' }: ReceiptsProps) {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
@@ -99,6 +103,13 @@ export function Receipts() {
     }
   };
 
+  const handleDeleteReceipt = async (receiptId: string) => {
+    if (confirm('Are you sure you want to delete this receipt?')) {
+      await supabase.from('receipts').delete().eq('id', receiptId);
+      loadReceipts();
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -119,17 +130,23 @@ export function Receipts() {
     );
   }
 
+  const filteredAssignments = assignments.filter((assignment) =>
+    assignment.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   if (!selectedAssignment) {
     return (
       <div>
         <h3 className="text-lg font-semibold text-slate-800 mb-4">Select an Assignment</h3>
-        {assignments.length === 0 ? (
+        {filteredAssignments.length === 0 ? (
           <div className="text-center py-12 bg-slate-50 rounded-lg border border-slate-200">
-            <p className="text-slate-600">No assignments found. Create an assignment first.</p>
+            <p className="text-slate-600">
+              {searchQuery ? 'No assignments match your search.' : 'No assignments found. Create an assignment first.'}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {assignments.map((assignment) => (
+            {filteredAssignments.map((assignment) => (
               <button
                 key={assignment.id}
                 onClick={() => setSelectedAssignment(assignment)}
@@ -149,6 +166,15 @@ export function Receipts() {
     );
   }
 
+  const filteredReceipts = receipts.filter((receipt) => {
+    const monthYear = receipt.month && receipt.year ? `${getMonthName(receipt.month)} ${receipt.year}`.toLowerCase() : '';
+    const amount = formatCurrency(receipt.amount).toLowerCase();
+    return (
+      monthYear.includes(searchQuery.toLowerCase()) ||
+      amount.includes(searchQuery.toLowerCase())
+    );
+  });
+
   return (
     <div>
       <div className="flex items-center space-x-3 mb-6">
@@ -164,10 +190,10 @@ export function Receipts() {
         </div>
       </div>
 
-      {receipts.length === 0 ? (
+      {filteredReceipts.length === 0 ? (
         <div className="text-center py-12 bg-slate-50 rounded-lg border border-slate-200">
           <p className="text-slate-600">
-            No receipts found. Receipts are automatically created when invoice months are marked as paid.
+            {searchQuery ? 'No receipts match your search.' : 'No receipts found. Receipts are automatically created when invoice months are marked as paid.'}
           </p>
         </div>
       ) : (
@@ -183,7 +209,7 @@ export function Receipts() {
               </tr>
             </thead>
             <tbody>
-              {receipts.map((receipt) => (
+              {filteredReceipts.map((receipt) => (
                 <tr key={receipt.id} className="border-b border-slate-100 hover:bg-slate-50">
                   <td className="py-3 px-4 font-medium text-slate-900">
                     {receipt.month && receipt.year
@@ -212,13 +238,20 @@ export function Receipts() {
                     )}
                   </td>
                   <td className="py-3 px-4">
-                    <div className="flex items-center justify-center">
+                    <div className="flex items-center justify-center space-x-2">
                       <button
                         onClick={() => openEditModal(receipt)}
                         className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         title="Edit receipt URL"
                       >
                         <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteReceipt(receipt.id)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete receipt"
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </td>
